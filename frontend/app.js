@@ -1,19 +1,52 @@
-// ---- Config (update BACKEND_URL after you deploy backend) ----
-const BACKEND_URL = "https://<your-new-backend>.onrender.com";  // <-- replace with your deployed backend URL
+// ---- Config ----
+const BACKEND_URL = "https://<your-new-backend>.onrender.com"; // <- set to your deployed backend
+const DEFAULTS = { VOICE_ON: true, AUTO_ZOOM_ON: true };
 
-// ---- Defaults (keep in sync with backend/settings.py) ----
-const DEFAULTS = {
-  VOICE_ON: true,
-  AUTO_ZOOM_ON: true
-};
+// ---- UI anchors ----
+const chatEl = document.getElementById("chat");
+const inputEl = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+const demoBtn = document.getElementById("btnDemo");
+const voiceBtn = document.getElementById("btnVoice");
+const zoomBtn = document.getElementById("btnZoom");
+const logEl = document.getElementById("eventslog");
 
-// ---- Minimal UI helpers ----
-const logEl = document.getElementById("events");
-function logEvent(e) {
-  const d = document.createElement("div");
-  d.className = "row";
-  d.textContent = JSON.stringify(e);
+// ---- State ----
+let voiceOn = DEFAULTS.VOICE_ON;
+let autoZoomOn = DEFAULTS.AUTO_ZOOM_ON;
+let lastSeq = 0;
+
+// ---- Helpers: chat/log/tts ----
+function nowHHMM(){
+  const d=new Date(); const p=n=>String(n).padStart(2,"0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function addMsg(role, text, chips){
+  const wrap=document.createElement("div");
+  wrap.className=`msg ${role}`;
+  wrap.innerHTML=`<div>${text}</div><span class="time">${nowHHMM()}</span>`;
+  if (chips?.length){
+    const row=document.createElement("div"); row.className="chips";
+    chips.forEach(label=>{
+      const b=document.createElement("button"); b.className="btn chip";
+      b.textContent=label; b.onclick=()=>sendText(label);
+      row.appendChild(b);
+    });
+    wrap.appendChild(row);
+  }
+  chatEl.appendChild(wrap);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+function logEvent(e){
+  const d=document.createElement("div"); d.className="row";
+  d.textContent=JSON.stringify(e);
   logEl.prepend(d);
+}
+function tts(text){
+  if(!voiceOn) return;
+  const s=window.speechSynthesis; if(!s) return;
+  const u=new SpeechSynthesisUtterance(String(text)); u.rate=0.92; u.pitch=1.0;
+  s.speak(u);
 }
 
 // ---- Map ----
@@ -21,199 +54,168 @@ const map = new maplibregl.Map({
   container: "map",
   style: "./style.json",
   center: [78.9629, 21.5937],
-  zoom: 5.5,
-  minZoom: 3,
-  maxZoom: 12
+  zoom: 5.5, minZoom:3, maxZoom:12
 });
-map.addControl(
-  new maplibregl.NavigationControl({ visualizePitch: false }),
-  "top-left"
-);
+map.addControl(new maplibregl.NavigationControl({visualizePitch:false}),"top-left");
 
-// simple red/green layers
-function ensureLayers() {
-  if (!map.getSource("alert"))
-    map.addSource("alert", {
-      type: "geojson",
-      data: { type: "FeatureCollection", features: [] }
-    });
-  if (!map.getLayer("alert-red"))
-    map.addLayer({
-      id: "alert-red",
-      type: "line",
-      source: "alert",
-      paint: {
-        "line-color": "#ff6b6b",
-        "line-width": 4.5,
-        "line-opacity": 0.98
-      },
-      layout: { "line-cap": "round", "line-join": "round" }
-    });
-  if (!map.getSource("fix"))
-    map.addSource("fix", {
-      type: "geojson",
-      data: { type: "FeatureCollection", features: [] }
-    });
-  if (!map.getLayer("fix-green"))
-    map.addLayer({
-      id: "fix-green",
-      type: "line",
-      source: "fix",
-      paint: {
-        "line-color": "#00d08a",
-        "line-width": 5.2,
-        "line-opacity": 0.98
-      },
-      layout: { "line-cap": "round", "line-join": "round" }
-    });
-}
-function toLineString(coords) {
-  return { type: "Feature", geometry: { type: "LineString", coordinates: coords } };
-}
+function ensureLayers(){
+  if(!map.getSource("routes")) map.addSource("routes",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
 
-// demo city anchors & corridors
-const CITY = {
-  WH1: { lat: 28.6139, lon: 77.209 },
-  WH2: { lat: 19.076, lon: 72.8777 },
-  WH3: { lat: 12.9716, lon: 77.5946 },
-  WH4: { lat: 17.385, lon: 78.4867 },
-  WH5: { lat: 22.5726, lon: 88.3639 }
+  if(!map.getSource("alert")) map.addSource("alert",{type:"geojson",data:{type:"FeatureCollection",features:[]}})
+  if(!map.getLayer("alert-red")) map.addLayer({id:"alert-red",type:"line",source:"alert",
+    paint:{"line-color":"#ff6b6b","line-width":4.8,"line-opacity":0.98},layout:{"line-cap":"round","line-join":"round"}});
+
+  if(!map.getSource("fix")) map.addSource("fix",{type:"geojson",data:{type:"FeatureCollection",features:[]}})
+  if(!map.getLayer("fix-green")) map.addLayer({id:"fix-green",type:"line",source:"fix",
+    paint:{"line-color":"#00d08a","line-width":5.4,"line-opacity":0.98},layout:{"line-cap":"round","line-join":"round"}});
+}
+function toLineString(coords){ return {type:"Feature",geometry:{type:"LineString",coordinates:coords}}; }
+
+// Minimal anchors & corridors (extend later)
+const CITY={
+  WH1:{lat:28.6139,lon:77.2090}, // Delhi
+  WH2:{lat:19.0760,lon:72.8777}, // Mumbai
+  WH3:{lat:12.9716,lon:77.5946}, // Bangalore
+  WH4:{lat:17.3850,lon:78.4867}, // Hyderabad
+  WH5:{lat:22.5726,lon:88.3639}  // Kolkata
 };
-const RP = {
-  "WH1-WH4": [[77.209, 28.6139], [78.4867, 17.385]],
-  "WH1-WH2": [[77.209, 28.6139], [72.8777, 19.076]],
-  "WH2-WH4": [[72.8777, 19.076], [78.4867, 17.385]],
-  "WH3-WH2": [[77.5946, 12.9716], [72.8777, 19.076]],
-  "WH5-WH2": [[88.3639, 22.5726], [72.8777, 19.076]]
+const RP={
+  "WH1-WH4":[[77.2090,28.6139],[78.4867,17.3850]],
+  "WH1-WH2":[[77.2090,28.6139],[72.8777,19.0760]],
+  "WH2-WH4":[[72.8777,19.0760],[78.4867,17.3850]],
+  "WH3-WH2":[[77.5946,12.9716],[72.8777,19.0760]],
+  "WH5-WH2":[[88.3639,22.5726],[72.8777,19.0760]],
 };
-const keyFor = (a, b) => (a < b ? `${a}-${b}` : `${b}-${a}`);
-function routeCoords(a, b) {
-  const k = keyFor(a, b);
-  return RP[k] || [
-    [CITY[a].lon, CITY[a].lat],
-    [CITY[b].lon, CITY[b].lat]
-  ];
+const keyFor=(a,b)=>a<b?`${a}-${b}`:`${b}-${a}`;
+function routeCoords(a,b){
+  const k=keyFor(a,b);
+  return RP[k]||[[CITY[a].lon,CITY[a].lat],[CITY[b].lon,CITY[b].lat]];
+}
+function featureForIds(a,b){ return toLineString(routeCoords(a,b)); }
+function setAlert(a,b){
+  const s=map.getSource("alert"); if(!s) return;
+  s.setData({type:"FeatureCollection",features:[featureForIds(a,b)]});
+}
+function clearAlert(){
+  const s=map.getSource("alert"); if(!s) return;
+  s.setData({type:"FeatureCollection",features:[]});
+}
+function setFixPairs(pairs){
+  const s=map.getSource("fix"); if(!s) return;
+  const feats=(pairs||[]).map(([u,v])=>featureForIds(u,v));
+  s.setData({type:"FeatureCollection",features:feats});
+}
+function fitToIds(list){
+  if(!autoZoomOn||!list?.length) return;
+  const pts = Array.isArray(list[0]) ? list.flat() : list;
+  const b=new maplibregl.LngLatBounds();
+  for(let i=0;i<pts.length;i++){
+    const id=pts[i];
+    if(CITY[id]) b.extend([CITY[id].lon,CITY[id].lat]);
+  }
+  if(!b.isEmpty()) map.fitBounds(b,{padding:{top:60,left:60,right:360,bottom:60},duration:650,maxZoom:6.9});
 }
 
-function setAlert(a, b) {
-  const src = map.getSource("alert");
-  if (!src) return;
-  src.setData({
-    type: "FeatureCollection",
-    features: [toLineString(routeCoords(a, b))]
-  });
-}
-function clearAlert() {
-  const s = map.getSource("alert");
-  if (s) s.setData({ type: "FeatureCollection", features: [] });
-}
-function setFixPairs(pairs) {
-  const s = map.getSource("fix");
-  if (!s) return;
-  const feats = (pairs || []).map(([u, v]) => toLineString(routeCoords(u, v)));
-  s.setData({ type: "FeatureCollection", features: feats });
-}
+// ---- WS Stream ----
+function handleEvent(evt){
+  if(evt.seq && evt.seq<=lastSeq) return;
+  if(evt.seq) lastSeq = evt.seq;
 
-// ---- WebSocket stream from backend ----
-let voiceOn = DEFAULTS.VOICE_ON;
-function tts(text) {
-  if (!voiceOn) return;
-  const synth = window.speechSynthesis;
-  if (!synth) return;
-  const u = new SpeechSynthesisUtterance(String(text));
-  u.rate = 0.92;
-  u.pitch = 1.0;
-  synth.speak(u);
-}
-
-// ---- Dispatcher: contract-compliant ----
-function handleEvent(evt) {
   logEvent(evt);
 
-  switch (evt.type) {
-    case "disruption": {
-      const { a, b } = evt.payload || {};
-      setAlert(a, b);
+  switch(evt.type){
+    case "disruption":{
+      const {a,b}=evt.payload||{};
+      setAlert(a,b); setFixPairs([]);
+      fitToIds([a,b]);
+      addMsg("assistant", `⚠️ Disruption on ${a}–${b}. Trucks paused.`, ["Fix", `Reroute ${a} -> WH2 -> ${b}`]);
       tts(`Disruption on ${a} to ${b}`);
       break;
     }
-    case "correct": {
-      const { a, b } = evt.payload || {};
-      clearAlert();
-      setFixPairs([]);
+    case "correct":{
+      const {a,b}=evt.payload||{};
+      clearAlert(); setFixPairs([]);
+      addMsg("assistant", `✅ Correction applied on ${a}–${b}. Flows resuming.`);
       tts(`Correction applied on ${a} to ${b}`);
       break;
     }
-    case "reroute": {
+    case "reroute":{
       const p = (evt.payload && evt.payload.path) || [];
-      const pairs = [];
-      for (let i = 0; i < p.length - 1; i++) pairs.push([p[i], p[i + 1]]);
-      setFixPairs(pairs);
+      const pairs=[]; for(let i=0;i<p.length-1;i++) pairs.push([p[i],p[i+1]]);
+      setFixPairs(pairs); fitToIds(p);
+      addMsg("assistant", `🟢 Detour active: ${p.join(" → ")}`);
       tts(`Detour via ${p.join(" to ")}`);
       break;
     }
-    case "inventory_delta": {
-      const { wh, delta, reason } = evt.payload || {};
-      logEvent({ type: "_info", msg: `Inventory ${wh} ${delta > 0 ? "+" : ""}${delta} (${reason || "delta"})` });
+    case "inventory_delta":{
+      const {wh,delta,reason}=evt.payload||{};
+      addMsg("assistant", `Inv update: ${wh} ${delta>0?"+":""}${delta}${reason?` (${reason})`:""}`);
       break;
     }
-    case "truck_add": {
-      const { id, origin, destination } = evt.payload || {};
-      logEvent({ type: "_info", msg: `New truck ${id} ${origin} -> ${destination}` });
+    case "truck_add":{
+      const {id,origin,destination}=evt.payload||{};
+      addMsg("assistant", `New truck ${id}: ${origin} → ${destination}`);
       break;
     }
-    case "query_result": {
-      logEvent({ type: "_answer", answer: evt.payload });
+    case "query_result":{
+      const ans = evt.payload?.answer;
+      addMsg("assistant", `Answer: ${typeof ans==="string"?ans:JSON.stringify(ans)}`);
       tts("Answer ready.");
       break;
     }
-    case "clarify": {
-      logEvent({ type: "_clarify", message: evt.payload?.message, options: evt.payload?.options });
+    case "clarify":{
+      const msg = evt.payload?.message||"Which option?";
+      const opts = evt.payload?.options||[];
+      addMsg("assistant", msg, opts);
       tts("Which option?");
       break;
     }
-    case "focus": {
-      logEvent({ type: "_focus", target: evt.payload?.target });
+    case "focus":{
+      const target=evt.payload?.target;
+      if(target && CITY[target]) fitToIds([target]);
+      addMsg("assistant", `Focusing ${target||"target"}`);
       break;
     }
-    default:
-      // tick, error, etc.
-      break;
+    default: /* tick, error, etc. */ break;
   }
 }
 
-function connectWS() {
+function connectWS(){
   const ws = new WebSocket(BACKEND_URL.replace(/^http/, "ws") + "/events/ws");
-  ws.onopen = () => logEvent({ type: "_ws", state: "open" });
-  ws.onmessage = (ev) => {
-    try {
-      const evt = JSON.parse(ev.data);
-      handleEvent(evt);
-    } catch (e) {
-      console.warn(e);
-    }
-  };
-  ws.onclose = () => {
-    logEvent({ type: "_ws", state: "closed" });
-    setTimeout(connectWS, 1500);
-  };
+  ws.onopen=()=>addMsg("assistant","(connected to event stream)");
+  ws.onmessage=(ev)=>{ try{ handleEvent(JSON.parse(ev.data)); }catch(e){ console.warn(e); } };
+  ws.onclose =()=>{ addMsg("assistant","(stream disconnected — retrying)"); setTimeout(connectWS,1500); };
 }
-map.once("load", () => {
-  ensureLayers();
-  connectWS();
-});
+map.once("load", ()=>{ ensureLayers(); connectWS(); });
 
-// ---- Buttons ----
-document.getElementById("btnDemo").onclick = async () => {
-  await fetch(BACKEND_URL + "/command", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: "Disrupt Delhi Hyderabad" })
-  });
-};
-document.getElementById("btnVoice").onclick = () => {
+// ---- Chat / Commands ----
+async function sendText(text){
+  if(!text||!text.trim()) return;
+  addMsg("user", text.trim());
+  inputEl.value="";
+  try{
+    await fetch(BACKEND_URL + "/command", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ text })
+    });
+  }catch(e){
+    addMsg("assistant","Backend unreachable. (Your message was not sent.)");
+  }
+}
+sendBtn.onclick = ()=>sendText(inputEl.value);
+inputEl.addEventListener("keydown",(e)=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendText(inputEl.value); } });
+
+// ---- Top controls ----
+demoBtn.onclick = ()=>sendText("Disrupt Delhi Hyderabad");
+voiceBtn.onclick= ()=>{
   voiceOn = !voiceOn;
-  document.getElementById("btnVoice").textContent = `Voice: ${voiceOn ? "On" : "Off"}`;
+  voiceBtn.textContent = `Voice: ${voiceOn?"On":"Off"}`;
 };
-// Init button label from defaults
-document.getElementById("btnVoice").textContent = `Voice: ${voiceOn ? "On" : "Off"}`;
+zoomBtn.onclick = ()=>{
+  autoZoomOn = !autoZoomOn;
+  zoomBtn.textContent = `Auto-Zoom: ${autoZoomOn?"On":"Off"}`;
+};
+// init labels
+voiceBtn.textContent = `Voice: ${voiceOn?"On":"Off"}`;
+zoomBtn.textContent = `Auto-Zoom: ${autoZoomOn?"On":"Off"}`;
