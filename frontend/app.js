@@ -1,5 +1,5 @@
 // ---- Config ----
-const BACKEND_URL = "https://<your-new-backend>.onrender.com"; // <- set to your deployed backend
+const BACKEND_URL = "https://threed-agentic-twins-v2-0.onrender.com"; // <- set to your deployed backend
 const DEFAULTS = { VOICE_ON: true, AUTO_ZOOM_ON: true };
 
 // ---- UI anchors ----
