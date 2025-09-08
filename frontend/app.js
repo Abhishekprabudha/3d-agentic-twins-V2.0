@@ -1,5 +1,5 @@
 // ---- Config (update BACKEND_URL after you deploy backend) ----
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://<your-new-backend>.onrender.com";  // <-- replace with your deployed backend URL
 
 // ---- Defaults (keep in sync with backend/settings.py) ----
 const DEFAULTS = {
@@ -75,21 +75,16 @@ function toLineString(coords) {
 const CITY = {
   WH1: { lat: 28.6139, lon: 77.209 },
   WH2: { lat: 19.076, lon: 72.8777 },
-  WH4: { lat: 17.385, lon: 78.4867 }
+  WH3: { lat: 12.9716, lon: 77.5946 },
+  WH4: { lat: 17.385, lon: 78.4867 },
+  WH5: { lat: 22.5726, lon: 88.3639 }
 };
 const RP = {
-  "WH1-WH4": [
-    [77.209, 28.6139],
-    [78.4867, 17.385]
-  ],
-  "WH1-WH2": [
-    [77.209, 28.6139],
-    [72.8777, 19.076]
-  ],
-  "WH2-WH4": [
-    [72.8777, 19.076],
-    [78.4867, 17.385]
-  ]
+  "WH1-WH4": [[77.209, 28.6139], [78.4867, 17.385]],
+  "WH1-WH2": [[77.209, 28.6139], [72.8777, 19.076]],
+  "WH2-WH4": [[72.8777, 19.076], [78.4867, 17.385]],
+  "WH3-WH2": [[77.5946, 12.9716], [72.8777, 19.076]],
+  "WH5-WH2": [[88.3639, 22.5726], [72.8777, 19.076]]
 };
 const keyFor = (a, b) => (a < b ? `${a}-${b}` : `${b}-${a}`);
 function routeCoords(a, b) {
@@ -131,27 +126,58 @@ function tts(text) {
   synth.speak(u);
 }
 
+// ---- Dispatcher: contract-compliant ----
 function handleEvent(evt) {
   logEvent(evt);
+
   switch (evt.type) {
-    case "disruption":
-      setAlert(evt.payload.a, evt.payload.b);
-      tts(`Disruption on ${evt.payload.a} to ${evt.payload.b}`);
+    case "disruption": {
+      const { a, b } = evt.payload || {};
+      setAlert(a, b);
+      tts(`Disruption on ${a} to ${b}`);
       break;
-    case "correct":
+    }
+    case "correct": {
+      const { a, b } = evt.payload || {};
       clearAlert();
       setFixPairs([]);
-      tts(`Correction applied on ${evt.payload.a} to ${evt.payload.b}`);
+      tts(`Correction applied on ${a} to ${b}`);
       break;
+    }
     case "reroute": {
-      const p = evt.payload.path || [];
+      const p = (evt.payload && evt.payload.path) || [];
       const pairs = [];
       for (let i = 0; i < p.length - 1; i++) pairs.push([p[i], p[i + 1]]);
       setFixPairs(pairs);
       tts(`Detour via ${p.join(" to ")}`);
       break;
     }
+    case "inventory_delta": {
+      const { wh, delta, reason } = evt.payload || {};
+      logEvent({ type: "_info", msg: `Inventory ${wh} ${delta > 0 ? "+" : ""}${delta} (${reason || "delta"})` });
+      break;
+    }
+    case "truck_add": {
+      const { id, origin, destination } = evt.payload || {};
+      logEvent({ type: "_info", msg: `New truck ${id} ${origin} -> ${destination}` });
+      break;
+    }
+    case "query_result": {
+      logEvent({ type: "_answer", answer: evt.payload });
+      tts("Answer ready.");
+      break;
+    }
+    case "clarify": {
+      logEvent({ type: "_clarify", message: evt.payload?.message, options: evt.payload?.options });
+      tts("Which option?");
+      break;
+    }
+    case "focus": {
+      logEvent({ type: "_focus", target: evt.payload?.target });
+      break;
+    }
     default:
+      // tick, error, etc.
       break;
   }
 }
@@ -187,11 +213,7 @@ document.getElementById("btnDemo").onclick = async () => {
 };
 document.getElementById("btnVoice").onclick = () => {
   voiceOn = !voiceOn;
-  document.getElementById("btnVoice").textContent = `Voice: ${
-    voiceOn ? "On" : "Off"
-  }`;
+  document.getElementById("btnVoice").textContent = `Voice: ${voiceOn ? "On" : "Off"}`;
 };
 // Init button label from defaults
-document.getElementById("btnVoice").textContent = `Voice: ${
-  voiceOn ? "On" : "Off"
-}`;
+document.getElementById("btnVoice").textContent = `Voice: ${voiceOn ? "On" : "Off"}`;
