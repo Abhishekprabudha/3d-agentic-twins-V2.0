@@ -1,0 +1,8 @@
+{
+  "name": "fleetline_revenue_demo",
+  "steps": [
+    { "at_ms": 0, "event": { "type": "disruption", "payload": {"a":"WH1","b":"WH4"} } },
+    { "at_ms": 1200, "event": { "type": "inventory_delta", "payload": {"wh":"WH2","delta":20,"reason":"revenue_opt"} } },
+    { "at_ms": 2400, "event": { "type": "reroute", "payload": {"path":["WH1","WH2","WH4"], "scope":"paused"} } }
+  ]
+}
