@@ -21,6 +21,7 @@
     .btn:hover{background:#1b1f2a}
     .btn.chip{background:var(--chip); padding:6px 10px; border-radius:999px; font-size:12px}
     .btn.small{padding:6px 8px; font-size:12px}
+    .btn[disabled]{opacity:.6; cursor:not-allowed}
 
     #chat{flex:1; overflow:auto; padding:12px}
     .msg{margin:8px 0; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:#0f1219}
@@ -53,7 +54,9 @@
     .truck{
       width:12px; height:8px; border-radius:3px; background:#e7ecf2; border:1px solid #5a6775;
       box-shadow:0 0 4px rgba(0,0,0,.45);
+      transition: opacity .2s ease, filter .2s ease;
     }
+    .truck.paused{ opacity:.45; filter: grayscale(.6); }
   </style>
 </head>
 <body>
