@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.staticfiles import StaticFiles
 from typing import List
-import asyncio
+from pathlib import Path
+import asyncio, os
 
 from models import Event
 from commands import parse_to_event
@@ -12,19 +13,29 @@ from engine import engine
 
 app = FastAPI(title="Agentic Twin v3.0")
 
-# TODO: set to your Netlify origin after deploy
+# ---------- CORS: configurable, non-breaking ----------
+# Set ALLOWED_ORIGINS in your host dashboard (Render/Railway) as a comma-separated list
+# e.g. "https://new-v3-site.netlify.app,https://another-preview.netlify.app"
+# If not set, default to "*" so you can bring up new links without touching code.
+_allowed = os.environ.get("ALLOWED_ORIGINS", "*")
+if _allowed.strip() == "*":
+    ORIGINS = ["*"]
+else:
+    ORIGINS = [o.strip() for o in _allowed.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # e.g., ["https://<yoursite>.netlify.app"]
+    allow_origins=ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
 
-# ---- Serve scenario JSONs over HTTP (GET /scenarios/<name>.json) ----
-app.mount("/scenarios", StaticFiles(directory="../data/scenarios", html=False), name="scenarios")
+# ---------- Serve scenario JSONs (absolute path, host-agnostic) ----------
+SCEN_DIR = Path(__file__).resolve().parents[1] / "data" / "scenarios"
+app.mount("/scenarios", StaticFiles(directory=str(SCEN_DIR), html=False), name="scenarios")
 
-# ---- In-memory broadcast hub ----
+# ---------- In-memory broadcast hub ----------
 class Hub:
     def __init__(self):
         self.seq = 0
