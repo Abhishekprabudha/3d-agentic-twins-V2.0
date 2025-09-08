@@ -1,0 +1,12 @@
+{
+  "events": [
+    { "delay_ms": 0,   "event": { "type": "disruption", "payload": { "a": "WH1", "b": "WH4" } } },
+    { "delay_ms": 1200,"event": { "type": "inventory_delta", "payload": { "wh": "WH2", "delta": -8, "reason": "demand_surge" } } },
+    { "delay_ms": 1600,"event": { "type": "truck_add", "payload": { "id": "T42", "origin": "WH2", "destination": "WH4" } } },
+    { "delay_ms": 1600,"event": { "type": "reroute", "payload": { "path": ["WH1","WH2","WH4"], "scope": "paused" } } },
+    { "delay_ms": 1600,"event": { "type": "inventory_delta", "payload": { "wh": "WH4", "delta": +12, "reason": "buffer_move" } } },
+    { "delay_ms": 1400,"event": { "type": "correct", "payload": { "a": "WH1", "b": "WH4" } } },
+    { "delay_ms": 1200,"event": { "type": "focus", "payload": { "target": "WH2" } } },
+    { "delay_ms": 800, "event": { "type": "query_result", "payload": { "kind": "status", "answer": { "WH2": {"inv": 472, "in": 1, "out": 1} } } } }
+  ]
+}
