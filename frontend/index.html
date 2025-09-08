@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentic Twin v3.0</title>
+  <link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet"/>
+  <style>
+    :root{--bg:#0a0b0d;--line:#262a31;--panel:#12141a;--text:#e6e6e6}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.35 system-ui,Segoe UI,Roboto,sans-serif}
+    #top{position:fixed;inset:12px auto auto 12px;z-index:10;display:flex;gap:8px}
+    .btn{background:#111318;border:1px solid var(--line);color:#e6e6e6;padding:8px 12px;border-radius:10px;cursor:pointer}
+    .btn:hover{background:#181a21}
+    #map{position:fixed;inset:0}
+    #log{position:fixed;left:12px;bottom:12px;z-index:11;background:rgba(18,20,26,.9);border:1px solid var(--line);border-radius:8px;padding:8px;max-width:420px;max-height:40vh;overflow:auto}
+    #log h4{margin:0 0 6px 0;font-size:13px;color:#aab3bd}
+    #log .row{font-size:12px;border-top:1px solid #222831;padding:4px 0}
+  </style>
+</head>
+<body>
+  <div id="top">
+    <button id="btnDemo" class="btn">▶ Demo</button>
+    <button id="btnVoice" class="btn">Voice: Off</button>
+  </div>
+
+  <div id="map"></div>
+
+  <div id="log">
+    <h4>Events</h4>
+    <div id="events"></div>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
