@@ -1,21 +1,28 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.staticfiles import StaticFiles
 from typing import List
+import asyncio
+
 from models import Event
 from commands import parse_to_event
 from scenarios import run_scenario
 from engine import engine
-import asyncio
 
 app = FastAPI(title="Agentic Twin v3.0")
 
-# TODO: replace "*" with your Netlify origin when you deploy
+# TODO: set to your Netlify origin after deploy
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
+    allow_origins=["*"],  # e.g., ["https://<yoursite>.netlify.app"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
+
+# ---- Serve scenario JSONs over HTTP (GET /scenarios/<name>.json) ----
+app.mount("/scenarios", StaticFiles(directory="../data/scenarios", html=False), name="scenarios")
 
 # ---- In-memory broadcast hub ----
 class Hub:
@@ -28,7 +35,9 @@ class Hub:
         self.seq += 1
         evt.seq = self.seq
         self.ring.append(evt)
-        if len(self.ring) > 500: self.ring = self.ring[-500:]
+        if len(self.ring) > 500:
+            self.ring = self.ring[-500:]
+
         dead = []
         for ws in list(self.clients):
             try:
@@ -36,8 +45,10 @@ class Hub:
             except Exception:
                 dead.append(ws)
         for d in dead:
-            try: self.clients.remove(d)
-            except ValueError: pass
+            try:
+                self.clients.remove(d)
+            except ValueError:
+                pass
 
 hub = Hub()
 
@@ -51,19 +62,21 @@ async def events_ws(ws: WebSocket):
     hub.clients.append(ws)
     try:
         while True:
-            # keep-alive to detect disconnects
+            # keep-alive
             await asyncio.sleep(60)
     except WebSocketDisconnect:
         pass
     finally:
-        try: hub.clients.remove(ws)
-        except ValueError: pass
+        try:
+            hub.clients.remove(ws)
+        except ValueError:
+            pass
 
 @app.post("/command")
 async def command(body: dict):
     text = (body.get("text") or "").strip()
     if not text:
-        evt = Event(source="chat", type="error", payload={"message":"Empty command"})
+        evt = Event(source="chat", type="error", payload={"message": "Empty command"})
         await hub.broadcast(evt)
         return JSONResponse({"ok": False, "events": [evt.model_dump()]}, status_code=400)
 
