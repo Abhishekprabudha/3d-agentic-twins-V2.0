@@ -1,98 +1,46 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Agentic Twin v3.0</title>
-  <link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet"/>
+  <title>Agentic Twins v2.0 — Netlify + Render</title>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
-    :root{
-      --bg:#0a0b0d; --panel:#111318; --line:#24262c; --text:#e6e6e6; --muted:#aab3bd;
-      --danger:#ff6b6b; --success:#00d08a; --chip:#1a1d25;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.35 system-ui,Segoe UI,Roboto,sans-serif}
-    #app{display:grid; grid-template-columns: 360px 1fr; height:100%}
-
-    /* Left: Chat panel */
-    #left{display:flex; flex-direction:column; border-right:1px solid var(--line); background:var(--panel)}
-    #topbar{display:flex; gap:8px; padding:10px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel); z-index:3}
-    .btn{background:#161922; color:var(--text); border:1px solid var(--line); padding:8px 12px; border-radius:10px; cursor:pointer}
-    .btn:hover{background:#1b1f2a}
-    .btn.chip{background:var(--chip); padding:6px 10px; border-radius:999px; font-size:12px}
-    .btn.small{padding:6px 8px; font-size:12px}
-    .btn[disabled]{opacity:.6; cursor:not-allowed}
-
-    #chat{flex:1; overflow:auto; padding:12px}
-    .msg{margin:8px 0; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:#0f1219}
-    .msg.user{border-color:#2b3750; background:#0e1320}
-    .msg.assistant{border-color:#283a32; background:#0f1614}
-    .time{display:block; color:var(--muted); font-size:11px; margin-top:4px}
-    .chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
-
-    #composer{display:flex; gap:8px; padding:10px; border-top:1px solid var(--line)}
-    #input{flex:1; background:#0f1118; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:10px}
-    #send{min-width:80px}
-
-    /* Right: Map + overlays */
-    #right{position:relative}
-    #map{position:absolute; inset:0}
-
-    #stats{
-      position:absolute; right:12px; top:12px; width:340px; background:rgba(17,19,24,.9);
-      border:1px solid var(--line); border-radius:12px; padding:10px; backdrop-filter: blur(4px); z-index:2
-    }
-    #stats h3{margin:0 0 8px 0; font-size:13px; color:var(--muted)}
-    #stats table{width:100%; border-collapse:collapse; font-size:12px}
-    #stats th,#stats td{padding:6px 4px; border-bottom:1px solid var(--line); text-align:left}
-    #stats .pos{color:var(--success)}
-    #stats .neg{color:var(--danger)}
-    #eventslog{max-height:18vh; overflow:auto; border-top:1px solid var(--line); margin-top:8px; padding-top:8px; font-size:12px}
-    .row{border-top:1px dashed #20242e; padding:4px 0}
-
-    /* Simple truck marker */
-    .truck{
-      width:12px; height:8px; border-radius:3px; background:#e7ecf2; border:1px solid #5a6775;
-      box-shadow:0 0 4px rgba(0,0,0,.45);
-      transition: opacity .2s ease, filter .2s ease;
-    }
-    .truck.paused{ opacity:.45; filter: grayscale(.6); }
+    html, body { height:100%; margin:0; background:#0f1115; color:#e6e6e6; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif }
+    #app { display:grid; grid-template-columns:1fr 380px; height:100% }
+    #map { position:relative }
+    #mapCanvas { position:absolute; inset:0 }
+    #panel { padding:16px }
+    .toolbar { position:absolute; top:12px; left:12px; display:flex; gap:8px; z-index:10 }
+    .btn { padding:8px 12px; border-radius:10px; background:#1a1d24; border:1px solid #2a2f3a; color:#e6e6e6; cursor:pointer }
+    .btn:active { transform:translateY(1px) }
+    .card { position:absolute; top:12px; right:12px; width:360px; background:#16191f; border:1px solid #2a2f3a; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,.4); padding:14px 16px }
+    .card h3 { margin:0 0 10px 0; font-size:16px; opacity:.95 }
+    table { width:100%; border-collapse:collapse; font-size:13px }
+    th,td { padding:6px 0; border-bottom:1px solid #232834 }
+    #debug { position:fixed; bottom:8px; left:8px; max-width:50vw; background:rgba(20,22,28,.9); border:1px solid #333a49; color:#c9d1d9; padding:8px 10px; border-radius:10px; font-size:12px; white-space:pre-wrap; line-height:1.3; z-index:9999; display:none }
   </style>
 </head>
 <body>
   <div id="app">
-    <!-- LEFT: chat -->
-    <div id="left">
-      <div id="topbar">
-        <button id="btnDemo" class="btn">▶ Demo</button>
-        <button id="btnVoice" class="btn">Voice: On</button>
-        <button id="btnZoom" class="btn">Auto-Zoom: On</button>
+    <div id="map">
+      <div class="toolbar">
+        <button class="btn" id="btnDemo">▶ Demo</button>
+        <button class="btn" id="btnVoice">Voice: <span id="voiceState">On</span></button>
+        <button class="btn" id="btnZoom">Auto-Zoom: <span id="zoomState">On</span></button>
       </div>
-
-      <div id="chat" aria-live="polite"></div>
-
-      <div id="composer">
-        <input id="input" type="text" placeholder="Ask or instruct… e.g., Disrupt Delhi–Hyderabad / Reroute Delhi -> Mumbai -> Hyderabad" />
-        <button id="send" class="btn">Send</button>
-      </div>
-    </div>
-
-    <!-- RIGHT: map -->
-    <div id="right">
-      <div id="map"></div>
-
-      <div id="stats">
+      <div id="mapCanvas"></div>
+      <div class="card" id="dash">
         <h3>Predicted Dashboard Status</h3>
-        <table id="statsTable">
-          <thead><tr><th>Warehouse</th><th>Inv</th><th>In</th><th>Out</th></tr></thead>
-          <tbody></tbody>
+        <table>
+          <thead><tr><th style="text-align:left">Warehouse</th><th>Inv</th><th>In</th><th>Out</th></tr></thead>
+          <tbody id="dashBody"><tr><td colspan="4" style="opacity:.6">Waiting for scenario…</td></tr></tbody>
         </table>
-        <div id="eventslog"></div>
       </div>
     </div>
+    <aside id="panel"></aside>
   </div>
-
-  <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
-  <script src="./app.js"></script>
+  <script type="module" src="./app.js"></script>
+  <div id="debug"></div>
 </body>
 </html>
