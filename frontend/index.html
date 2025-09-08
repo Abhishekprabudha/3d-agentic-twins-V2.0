@@ -36,11 +36,24 @@
     /* Right: Map + overlays */
     #right{position:relative}
     #map{position:absolute; inset:0}
-    #stats{position:absolute; right:12px; top:12px; width:320px; background:rgba(17,19,24,.9); border:1px solid var(--line);
-           border-radius:12px; padding:10px; backdrop-filter: blur(4px); z-index:2}
+
+    #stats{
+      position:absolute; right:12px; top:12px; width:340px; background:rgba(17,19,24,.9);
+      border:1px solid var(--line); border-radius:12px; padding:10px; backdrop-filter: blur(4px); z-index:2
+    }
     #stats h3{margin:0 0 8px 0; font-size:13px; color:var(--muted)}
-    #eventslog{max-height:28vh; overflow:auto; border-top:1px solid var(--line); margin-top:8px; padding-top:8px; font-size:12px}
+    #stats table{width:100%; border-collapse:collapse; font-size:12px}
+    #stats th,#stats td{padding:6px 4px; border-bottom:1px solid var(--line); text-align:left}
+    #stats .pos{color:var(--success)}
+    #stats .neg{color:var(--danger)}
+    #eventslog{max-height:18vh; overflow:auto; border-top:1px solid var(--line); margin-top:8px; padding-top:8px; font-size:12px}
     .row{border-top:1px dashed #20242e; padding:4px 0}
+
+    /* Simple truck marker */
+    .truck{
+      width:12px; height:8px; border-radius:3px; background:#e7ecf2; border:1px solid #5a6775;
+      box-shadow:0 0 4px rgba(0,0,0,.45);
+    }
   </style>
 </head>
 <body>
@@ -67,6 +80,10 @@
 
       <div id="stats">
         <h3>Predicted Dashboard Status</h3>
+        <table id="statsTable">
+          <thead><tr><th>Warehouse</th><th>Inv</th><th>In</th><th>Out</th></tr></thead>
+          <tbody></tbody>
+        </table>
         <div id="eventslog"></div>
       </div>
     </div>
