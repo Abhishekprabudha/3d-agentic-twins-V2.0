@@ -13,15 +13,18 @@ const logEl = document.getElementById("eventslog");
 const statsBody = document.querySelector("#statsTable tbody");
 
 // ---- State ----
-let voiceOn = DEFAULTS.VOICE_ON;
-let autoZoomOn = DEFAULTS.AUTO_ZOOM_ON;
+let voiceOn = JSON.parse(localStorage.getItem("voiceOn") ?? String(DEFAULTS.VOICE_ON));
+let autoZoomOn = JSON.parse(localStorage.getItem("autoZoomOn") ?? String(DEFAULTS.AUTO_ZOOM_ON));
 let lastSeq = 0;
+
+// Track disrupted corridors → pause trucks that run on them
+const blocked = new Set(); // keys like "WH1-WH4"
 
 // --- Baseline & Predictive stats (simple, local) ---
 const BASE_INV = { WH1:520, WH2:480, WH3:430, WH4:410, WH5:460 };
 const WNAMES   = { WH1:"Delhi", WH2:"Mumbai", WH3:"Bangalore", WH4:"Hyderabad", WH5:"Kolkata" };
-let baseStats  = {};  // initial snapshot
-let predStats  = {};  // live predicted values
+let baseStats  = {};
+let predStats  = {};
 
 function initStats(){
   baseStats = {};
@@ -58,7 +61,6 @@ function applyDisruption(a,b){
   predStats = s; renderStats(predStats);
 }
 function applyCorrect(a,b){
-  // restore to baseline for those two nodes
   const s = copyStats(predStats);
   for(const id of [a,b]) if(baseStats[id]) s[id] = {...baseStats[id]};
   predStats = s; renderStats(predStats);
@@ -96,7 +98,12 @@ function addMsg(role, text, chips){
     const row=document.createElement("div"); row.className="chips";
     chips.forEach(label=>{
       const b=document.createElement("button"); b.className="btn chip";
-      b.textContent=label; b.onclick=()=>sendText(label);
+      b.textContent=label;
+      b.onclick=async ()=>{
+        b.disabled = true;
+        await sendText(label);
+        b.disabled = false;
+      };
       row.appendChild(b);
     });
     wrap.appendChild(row);
@@ -109,11 +116,11 @@ function logEvent(e){
   d.textContent=JSON.stringify(e);
   logEl.prepend(d);
 }
-function tts(text){
+function ttsDouble(text){
   if(!voiceOn) return;
   const s=window.speechSynthesis; if(!s) return;
-  const u=new SpeechSynthesisUtterance(String(text)); u.rate=0.92; u.pitch=1.0;
-  s.speak(u);
+  const speak = () => { const u=new SpeechSynthesisUtterance(String(text)); u.rate=0.92; u.pitch=1.0; s.speak(u); };
+  speak(); setTimeout(speak, 1200); // play twice with a small gap
 }
 
 // ---- Map ----
@@ -183,23 +190,68 @@ function fitToIds(list){
   if(!b.isEmpty()) map.fitBounds(b,{padding:{top:60,left:60,right:360,bottom:60},duration:650,maxZoom:6.9});
 }
 
-// ---- Simple moving truck for truck_add ----
+// ---- Simple moving truck w/ pause & release ----
 const liveTrucks = [];
 function spawnTruck(id, origin, destination){
   if(!CITY[origin] || !CITY[destination]) return;
-  // build a simple 2-point path (origin -> destination)
-  const path = routeCoords(origin, destination);
+  const path = routeCoords(origin, destination); // 2-point path
   const el = document.createElement("div");
   el.className = "truck";
   const marker = new maplibregl.Marker({element: el}).setLngLat(path[0]).addTo(map);
-  const T = { id, marker, path, t: 0, speed: 0.0008 + Math.random()*0.0006 }; // tweak for motion
+  const corrKey = keyFor(origin, destination);
+  const paused = blocked.has(corrKey);
+  if (paused) el.classList.add("paused");
+
+  const T = {
+    id, origin, destination,
+    marker, path, t: 0,
+    speed: 0.0008 + Math.random()*0.0006,
+    paused, corrKey, basePath: path
+  };
   liveTrucks.push(T);
+}
+function pauseTrucksOn(a,b){
+  const k = keyFor(a,b); blocked.add(k);
+  for(const T of liveTrucks){
+    if(T.corrKey === k && !T.paused){
+      T.paused = true;
+      T.marker.getElement().classList.add("paused");
+    }
+  }
+}
+function releaseTrucksVia(path){
+  if(!path || path.length<2) return;
+  const A = path[0], Z = path[path.length-1];
+  const k = keyFor(A,Z); // treat reroute as reopening the main corridor A–Z
+  blocked.delete(k);
+  const newPath = routeCoords(A,Z);
+  for(const T of liveTrucks){
+    if(T.corrKey === k && T.paused){
+      T.paused = false;
+      T.path = newPath;
+      T.t = 0;
+      T.marker.getElement().classList.remove("paused");
+    }
+  }
+}
+function correctCorridor(a,b){
+  const k = keyFor(a,b);
+  blocked.delete(k);
+  for(const T of liveTrucks){
+    if(T.corrKey === k && T.paused){
+      T.paused = false;
+      T.path = T.basePath; // restore to original
+      T.t = 0;
+      T.marker.getElement().classList.remove("paused");
+    }
+  }
 }
 function animateTrucks(){
   for(const T of liveTrucks){
     if(!T.path || T.path.length<2) continue;
+    if(T.paused) continue;
     T.t += T.speed;
-    if(T.t >= 1){ T.t = 0; } // loop for now
+    if(T.t >= 1){ T.t = 0; } // loop for demo
     const [x1,y1] = T.path[0], [x2,y2] = T.path[1];
     const lng = x1 + (x2 - x1)*T.t;
     const lat = y1 + (y2 - y1)*T.t;
@@ -222,16 +274,18 @@ function handleEvent(evt){
       setAlert(a,b); setFixPairs([]);
       fitToIds([a,b]);
       applyDisruption(a,b);
+      pauseTrucksOn(a,b);
       addMsg("assistant", `⚠️ Disruption on ${a}–${b}. Trucks paused.`, ["Fix", `Reroute ${a} -> WH2 -> ${b}`]);
-      tts(`Disruption on ${a} to ${b}`);
+      ttsDouble(`Disruption on ${a} to ${b}`);
       break;
     }
     case "correct":{
       const {a,b}=evt.payload||{};
       clearAlert(); setFixPairs([]);
       applyCorrect(a,b);
+      correctCorridor(a,b);
       addMsg("assistant", `✅ Correction applied on ${a}–${b}. Flows resuming.`);
-      tts(`Correction applied on ${a} to ${b}`);
+      ttsDouble(`Correction applied on ${a} to ${b}`);
       break;
     }
     case "reroute":{
@@ -239,8 +293,9 @@ function handleEvent(evt){
       const pairs=[]; for(let i=0;i<p.length-1;i++) pairs.push([p[i],p[i+1]]);
       setFixPairs(pairs); fitToIds(p);
       applyReroute(p);
+      releaseTrucksVia(p); // unpause trucks on that corridor and move A->Z
       addMsg("assistant", `🟢 Detour active: ${p.join(" → ")}`);
-      tts(`Detour via ${p.join(" to ")}`);
+      ttsDouble(`Detour via ${p.join(" to ")}`);
       break;
     }
     case "inventory_delta":{
@@ -258,14 +313,14 @@ function handleEvent(evt){
     case "query_result":{
       const ans = evt.payload?.answer;
       addMsg("assistant", `Answer: ${typeof ans==="string"?ans:JSON.stringify(ans)}`);
-      tts("Answer ready.");
+      ttsDouble("Answer ready.");
       break;
     }
     case "clarify":{
       const msg = evt.payload?.message||"Which option?";
       const opts = evt.payload?.options||[];
       addMsg("assistant", msg, opts);
-      tts("Which option?");
+      ttsDouble("Which option?");
       break;
     }
     case "focus":{
@@ -291,6 +346,7 @@ async function sendText(text){
   if(!text||!text.trim()) return;
   addMsg("user", text.trim());
   inputEl.value="";
+  sendBtn.disabled = true;
   try{
     await fetch(BACKEND_URL + "/command", {
       method:"POST",
@@ -299,6 +355,8 @@ async function sendText(text){
     });
   }catch(e){
     addMsg("assistant","Backend unreachable. (Your message was not sent.)");
+  } finally {
+    sendBtn.disabled = false;
   }
 }
 sendBtn.onclick = ()=>sendText(inputEl.value);
@@ -307,11 +365,11 @@ inputEl.addEventListener("keydown",(e)=>{ if(e.key==="Enter" && !e.shiftKey){ e.
 // ---- Top controls ----
 demoBtn.onclick = ()=>sendText("Disrupt Delhi Hyderabad");
 voiceBtn.onclick= ()=>{
-  voiceOn = !voiceOn;
+  voiceOn = !voiceOn; localStorage.setItem("voiceOn", JSON.stringify(voiceOn));
   voiceBtn.textContent = `Voice: ${voiceOn?"On":"Off"}`;
 };
 zoomBtn.onclick = ()=>{
-  autoZoomOn = !autoZoomOn;
+  autoZoomOn = !autoZoomOn; localStorage.setItem("autoZoomOn", JSON.stringify(autoZoomOn));
   zoomBtn.textContent = `Auto-Zoom: ${autoZoomOn?"On":"Off"}`;
 };
 // init labels
