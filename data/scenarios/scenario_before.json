@@ -1,0 +1,43 @@
+{
+  "warehouses": [
+    { "id": "WH1", "location": "Delhi",     "inventory": 520 },
+    { "id": "WH2", "location": "Mumbai",    "inventory": 480 },
+    { "id": "WH3", "location": "Bangalore", "inventory": 430 },
+    { "id": "WH4", "location": "Hyderabad", "inventory": 410 },
+    { "id": "WH5", "location": "Kolkata",   "inventory": 460 }
+  ],
+  "trucks": [
+    { "id": "T1",  "origin": "WH1", "destination": "WH2", "status": "Delayed",  "delay_hours": 6 },
+    { "id": "T2",  "origin": "WH1", "destination": "WH3", "status": "On-Time",  "delay_hours": 0 },
+    { "id": "T3",  "origin": "WH1", "destination": "WH5", "status": "Delayed",  "delay_hours": 4 },
+
+    { "id": "T4",  "origin": "WH2", "destination": "WH1", "status": "On-Time",  "delay_hours": 0 },
+    { "id": "T5",  "origin": "WH2", "destination": "WH3", "status": "On-Time",  "delay_hours": 0 },
+    { "id": "T6",  "origin": "WH2", "destination": "WH4", "status": "On-Time",  "delay_hours": 0 },
+
+    { "id": "T7",  "origin": "WH3", "destination": "WH2", "status": "Delayed",  "delay_hours": 5 },
+    { "id": "T8",  "origin": "WH3", "destination": "WH4", "status": "On-Time",  "delay_hours": 0 },
+    { "id": "T9",  "origin": "WH3", "destination": "WH5", "status": "On-Time",  "delay_hours": 0 },
+
+    { "id": "T10", "origin": "WH4", "destination": "WH1", "status": "On-Time",  "delay_hours": 0 },
+    { "id": "T11", "origin": "WH4", "destination": "WH2", "status": "Delayed",  "delay_hours": 3 },
+    { "id": "T12", "origin": "WH4", "destination": "WH5", "status": "On-Time",  "delay_hours": 0 },
+
+    { "id": "T13", "origin": "WH5", "destination": "WH1", "status": "On-Time",  "delay_hours": 0 },
+    { "id": "T14", "origin": "WH5", "destination": "WH2", "status": "Delayed",  "delay_hours": 2 },
+    { "id": "T15", "origin": "WH5", "destination": "WH4", "status": "On-Time",  "delay_hours": 0 }
+  ],
+  "commentary": {
+    "static": "Baseline network with five warehouses. Several disruptions are emerging; Mumbai and Kolkata may face short-term shortages if delays persist.",
+    "timeline": [
+      { "delay_ms":  400, "msg": "Initial assessment: Five warehouses online — Delhi, Mumbai, Bangalore, Hyderabad, Kolkata." },
+      { "delay_ms":  600, "msg": "Disruption 1: Landslide on the Delhi–Mumbai corridor. Truck T1 delayed by six hours." },
+      { "delay_ms":  600, "msg": "Disruption 2: Heavy rains on the Bangalore–Mumbai link. Truck T7 delayed by five hours." },
+      { "delay_ms":  600, "msg": "Disruption 3: Multi-vehicle accident near Hyderabad affecting Truck T11 bound to Mumbai." },
+      { "delay_ms":  600, "msg": "Disruption 4: Roadworks on the Delhi–Kolkata route slowing Truck T3." },
+      { "delay_ms":  600, "msg": "Disruption 5: Congestion leaving Kolkata toward Mumbai, impacting Truck T14." },
+      { "delay_ms":  800, "msg": "Risk: Mumbai outbound and inbound flows reduced. Inventory at Mumbai trending to deficit within 10–12 hours if no reroute is applied." },
+      { "delay_ms":  800, "msg": "Risk: Kolkata faces replenishment lag due to T3 and T14 delays." }
+    ]
+  }
+}
